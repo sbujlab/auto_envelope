@@ -9,6 +9,7 @@
 #include "TFile.h"
 #include "TImage.h"
 #include <limits>
+#include <fstream>
 #include "remolltypes.hh"
 
 int z_pos = 0; //default starting position is z=0
@@ -19,10 +20,6 @@ TGraph* hull;
 const int maxv = 20;
 double minArea; //minimum area unit considered. smaller = less sensitive
 double criticalPoints; //hits treated as zero. smaller = more sensitive
-
-
-double xVertices[maxv];
-double yVertices[maxv];
 
 double* particlesX;
 double* particlesY;
@@ -105,44 +102,44 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
     double xDelta = rightBound - leftBound;
     double yDelta = upperBound - lowerBound;
     double area = xDelta * yDelta;
-	
-	//std::cout << "points: " << countPointsInBounds(rightBound, leftBound, upperBound, lowerBound) << std::endl;
-	//std::cout << "area:" << area << std::endl;
-	//std::cout << "right:" << rightBound << std::endl;
-	//std::cout << "left:" << leftBound << std::endl;
-	//std::cout << "upper:" << upperBound << std::endl;
-	//std::cout << "lower:" << lowerBound << std::endl;
-	if (area <= minArea)
-	{
-		return;
-	}
-	if (countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
-	{
-		//space is not in the envelope
+
+    //std::cout << "points: " << countPointsInBounds(rightBound, leftBound, upperBound, lowerBound) << std::endl;
+    //std::cout << "area:" << area << std::endl;
+    //std::cout << "right:" << rightBound << std::endl;
+    //std::cout << "left:" << leftBound << std::endl;
+    //std::cout << "upper:" << upperBound << std::endl;
+    //std::cout << "lower:" << lowerBound << std::endl;
+    if (area <= minArea)
+    {
+        return;
+    }
+    if (countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
+    {
+        //space is not in the envelope
         std::cout << "drawing" << std::endl;
-		TGraph *g3 = new TGraph();
-		g3->SetPoint(0, rightBound, upperBound);
-		g3->SetPoint(1, rightBound, lowerBound);
-		g3->SetPoint(2, leftBound, lowerBound);
-		g3->SetPoint(3, leftBound, upperBound);
-		g3->SetFillColor(rand() % 100 + 1);
-		mg->Add(g3);
-		if (area <= 4*minArea)
-		{
+        TGraph *g3 = new TGraph();
+        g3->SetPoint(0, rightBound, upperBound);
+        g3->SetPoint(1, rightBound, lowerBound);
+        g3->SetPoint(2, leftBound, lowerBound);
+        g3->SetPoint(3, leftBound, upperBound);
+        g3->SetFillColor(rand() % 100 + 1);
+        mg->Add(g3);
+        if (area <= 4*minArea)
+        {
             std::cout << "point" << std::endl;
-			g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/2));
-			return;
-		}
-	}
-	else //enough points to not be noise
-	{ 	//but where are those points?
+            g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/2));
+            return;
+        }
+    }
+    else //enough points to not be noise
+    { 	//but where are those points?
         std::cout << "recur" << std::endl;
-		checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound); //bot  left	
-		checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound); //bot right	
-		checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2)); //top left	
-		checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound, upperBound - (yDelta/2)); //top right	
-        	
-	}
+        checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound); //bot  left	
+        checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound); //bot right	
+        checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2)); //top left	
+        checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound, upperBound - (yDelta/2)); //top right	
+
+    }
 }
 
 bool isCounterClockwise(double p1x, double p1y, double p2x, double p2y, double p3x, double p3y )
@@ -152,7 +149,7 @@ bool isCounterClockwise(double p1x, double p1y, double p2x, double p2y, double p
 
 int countPointsUnderLine(double sX, double sY, double eX, double eY)
 {
-	int count = 0;
+    int count = 0;
 
     int sign = -1;
     if (sX > eX)
@@ -164,15 +161,15 @@ int countPointsUnderLine(double sX, double sY, double eX, double eY)
     }
 
     double slope = ((eY-sY) / (eX-sX));
-    
 
-	for (unsigned int i = 0; i < goodParticles; i++)
-	{
-		if (particlesX[i] >= sX  && particlesX[i] <= eX && particlesY[i] <= (sY + slope*(particlesX[i]-sX)))
-			count++;
-	//std::cout << "X: " << particlesX[i] << endl << "Y: :" << particlesY[i] << endl;
-	}
-	return sign*count;
+
+    for (unsigned int i = 0; i < goodParticles; i++)
+    {
+        if (particlesX[i] >= sX  && particlesX[i] <= eX && particlesY[i] <= (sY + slope*(particlesX[i]-sX)))
+            count++;
+        //std::cout << "X: " << particlesX[i] << endl << "Y: :" << particlesY[i] << endl;
+    }
+    return sign*count;
 }
 
 double getPointsEnclosed(TGraph* graph)
@@ -186,7 +183,7 @@ double getPointsEnclosed(TGraph* graph)
 
         //stats[0] += (eX - sX) *((sY + eY)/2);//trapezoidal area      
         //stats[1] 
-            points += countPointsUnderLine(sX, sY, eX, eY); //count
+        points += countPointsUnderLine(sX, sY, eX, eY); //count
     }
     return points;
 }
@@ -207,7 +204,7 @@ TGraph* getNearestPoints(TGraph* data, double cX, double cY, int k)
     k = (k < data->GetN())? k : data->GetN();
     TGraph* nearest = new TGraph(*data);
     nearest->Sort(&distanceComparator);
-    
+
     while (nearest->GetN() > k)
     {
         nearest->RemovePoint(nearest->GetN()-1);
@@ -223,70 +220,70 @@ bool IntersectsQ(TGraph* g1, int pid1, TGraph* g2, int pid2, TGraph* g3, int pid
     g2->GetPoint(pid2, p2x, p2y);
     g3->GetPoint(pid3, p3x, p3y);
     g4->GetPoint(pid4, p4x, p4y);     
-  
+
 
     double s1x = p2x-p1x; double s1y = p2y-p1y;
     double s2x = p4x-p3x; double s2y = p4y-p3y;
 
-    
+
     double snum = (-s1y * (p1x - p3x) + s1x * (p1y - p3y));
     double tnum = (s2x * (p1y - p3y) - s2y * (p1x - p3x));
     double den = (-s2x * s1y + s1x * s2y);
 
-    
+
     //FIXME
     double s = snum/den;
     double t = tnum/den;
     double ix, iy;
-        
+
     /*std::cout << "Collision?"<< std::endl;
-    std::cout << "p1x: " << p1x <<std::endl;
-    std::cout << "p1y: " << p1y <<std::endl;
-    std::cout << "p2x: " << p2x <<std::endl;
-    std::cout << "p2y: " << p2y <<std::endl;
-    std::cout << "p3x: " << p3x <<std::endl;
-    std::cout << "p3y: " << p3y <<std::endl;
-    std::cout << "p4x: " << p4x <<std::endl;
-    std::cout << "p4y: " << p4y <<std::endl;
-    
-    
-    std::cout << "snum: " << snum << std::endl;
-    std::cout << "s: " << s << std::endl;
-    std::cout << "tnum: " << tnum << std::endl;
-    std::cout << "t: " << t << std::endl;
-    std::cout << "den: " << den << std::endl;
-    */
+      std::cout << "p1x: " << p1x <<std::endl;
+      std::cout << "p1y: " << p1y <<std::endl;
+      std::cout << "p2x: " << p2x <<std::endl;
+      std::cout << "p2y: " << p2y <<std::endl;
+      std::cout << "p3x: " << p3x <<std::endl;
+      std::cout << "p3y: " << p3y <<std::endl;
+      std::cout << "p4x: " << p4x <<std::endl;
+      std::cout << "p4y: " << p4y <<std::endl;
+
+
+      std::cout << "snum: " << snum << std::endl;
+      std::cout << "s: " << s << std::endl;
+      std::cout << "tnum: " << tnum << std::endl;
+      std::cout << "t: " << t << std::endl;
+      std::cout << "den: " << den << std::endl;
+      */
     if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
     {
         //Collision detected
         ix = p1x + (t * s1x);
         iy = p1y + (t * s1y);
         /*std::cout << "Collision found at " << std::endl;
-        std::cout << "ix: " << ix << std::endl;
-        std::cout << "iy: " << iy << std::endl;
-        */
+          std::cout << "ix: " << ix << std::endl;
+          std::cout << "iy: " << iy << std::endl;
+          */
         //if (t == 0) return false; //line segments are allow to connect to form a hull
         return true;
     }
     return false;
     /*
-    double ax = p2x - p1x;     // direction of line a
-    double ay = p2y - p1y;     // ax and ay as above
-    double bx = p3x - p4x;     // direction of line b, reversed
-    double by = p3y - p4y;     // really -bx and -by as above
-    double dx = p3x - p1x;   // right-hand side
-    double dy = p3y - p1y;
-    double det = ax * by - ay * bx;
-    std::cout << "Intersect- " << (dx * by - dy * bx) << std::endl;
-    std::cout << "Intersect2- " << (ax * dy - ay * dx) << std::endl;
-    std::cout << "Intersect det- " << det << std::endl;
-    if (det == 0) return false;
-    double r = (dx * by - dy * bx) / det;
-    double s = (ax * dy - ay * dx) / det;
-    std::cout << "Intersect r- " << r << std::endl;
-    std::cout << "Intersect s- " << s << std::endl;
-    return !(r <= 0 || r > 1 || s < 0 || s > 1);
-*/
+       double ax = p2x - p1x;     // direction of line a
+       double ay = p2y - p1y;     // ax and ay as above
+       double bx = p3x - p4x;     // direction of line b, reversed
+       double by = p3y - p4y;     // really -bx and -by as above
+       double dx = p3x - p1x;   // right-hand side
+       double dy = p3y - p1y;
+       double det = ax * by - ay * bx;
+       std::cout << "Intersect- " << (dx * by - dy * bx) << std::endl;
+       std::cout << "Intersect2- " << (ax * dy - ay * dx) << std::endl;
+       std::cout << "Intersect det- " << det << std::endl;
+       if (det == 0) return false;
+       double r = (dx * by - dy * bx) / det;
+       double s = (ax * dy - ay * dx) / det;
+       std::cout << "Intersect r- " << r << std::endl;
+       std::cout << "Intersect s- " << s << std::endl;
+       return !(r <= 0 || r > 1 || s < 0 || s > 1);
+       */
 }
 
 const double pi = 3.1415926535897;
@@ -360,7 +357,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         {
             data->SetPoint(data->GetN(), tX, tY);
         }
-        
+
         //std::cout << "check 1" << std::endl;
         //get and sort neighbors descending by right hand turn
         kNearestPoints = getNearestPoints(data, cX, cY, k);
@@ -368,31 +365,31 @@ TGraph* orderPoints(TGraph* pointList, int k)
         kNearestPoints->Sort(&AngleComparator, kFALSE); 
 
         /*if (step >= 500) //FIXME
-        {
-            //kNearestPoints->Draw("AL");
-            
-            for (int it = 0; it < kNearestPoints->GetN(); it++)
-            {
-                double bX, bY;
-                kNearestPoints->GetPoint(it, bX, bY);
-                std::cout << "bp " << it << ": " << bX << ", " << bY << std::endl;
-                std::cout << "@ " << getAngle(bX, bY) << std::endl;
-                  
-            }
-                TGraph * test = new TGraph();
-                test->SetPoint(0, -1, 0);
-                test->SetPoint(1, 1, 0);
+          {
+        //kNearestPoints->Draw("AL");
 
-                test->SetPoint(2, 1, 0);
-                test->SetPoint(3, 2, 0);
-                
-                std::cout << "Intersect Test" << IntersectsQ(test, 2, test, 3, test, 0, test, 1) << std::endl;
-                std::cout << "angle test" << getAngle(0, 1, -1, 0) << std::endl;
-                  std::cout << "angle test" << getAngle(0, 1, 0, 1) << std::endl;
-                  std::cout << "angle test" << getAngle(0, 1, 1, 0) << std::endl;
-                  std::cout << "angle test" << getAngle(0, 1, 0, -1) << std::endl;
-                    
-                return hull; 
+        for (int it = 0; it < kNearestPoints->GetN(); it++)
+        {
+        double bX, bY;
+        kNearestPoints->GetPoint(it, bX, bY);
+        std::cout << "bp " << it << ": " << bX << ", " << bY << std::endl;
+        std::cout << "@ " << getAngle(bX, bY) << std::endl;
+
+        }
+        TGraph * test = new TGraph();
+        test->SetPoint(0, -1, 0);
+        test->SetPoint(1, 1, 0);
+
+        test->SetPoint(2, 1, 0);
+        test->SetPoint(3, 2, 0);
+
+        std::cout << "Intersect Test" << IntersectsQ(test, 2, test, 3, test, 0, test, 1) << std::endl;
+        std::cout << "angle test" << getAngle(0, 1, -1, 0) << std::endl;
+        std::cout << "angle test" << getAngle(0, 1, 0, 1) << std::endl;
+        std::cout << "angle test" << getAngle(0, 1, 1, 0) << std::endl;
+        std::cout << "angle test" << getAngle(0, 1, 0, -1) << std::endl;
+
+        return hull; 
         }*/
 
         bool intersects = true;
@@ -413,11 +410,11 @@ TGraph* orderPoints(TGraph* pointList, int k)
             while (!intersects && j <= hull->GetN() - lastPoint)
             {
                 /*std::cout << "info " << hull->GetN() << std::endl;
-                std::cout << "hull " << step-2 << std::endl;
-                std::cout << "kNear " << i << std::endl;
-                std::cout << "hull " << step-1-j << std::endl;
-                std::cout << "hull " << step-j << std::endl;
-                */intersects = IntersectsQ(hull, step-2, kNearestPoints, i, hull, step-1-j, hull, step-j);
+                  std::cout << "hull " << step-2 << std::endl;
+                  std::cout << "kNear " << i << std::endl;
+                  std::cout << "hull " << step-1-j << std::endl;
+                  std::cout << "hull " << step-j << std::endl;
+                  */intersects = IntersectsQ(hull, step-2, kNearestPoints, i, hull, step-1-j, hull, step-j);
                 //std::cout << "Intersects: " << intersects << std::endl;
                 j++;
             }
@@ -432,10 +429,10 @@ TGraph* orderPoints(TGraph* pointList, int k)
         kNearestPoints->GetPoint(i, cX, cY);
         //std::cout << "check" << cX << " " << cY << " " << tX << " " << tY << std::endl;
         hull->SetPoint(hull->GetN(), cX, cY);
-        
+
         //prevAngle = getAngle(hull, step, step-1);
         hull->GetPoint(hull->GetN()-2, prevX, prevY); 
-        
+
         RemovePoint(data, cX, cY);
         step++;
     }
@@ -451,43 +448,43 @@ TGraph* orderPoints(TGraph* pointList, int k)
 }
 
 /*void DynamicCoordinates() {
-	gPad->GetCanvas()->FeedbackMode(kTRUE);
-	if (!gPad) {
-    std::cout << "gPad is null" << endl;
-		return;
-	}	
-	//checkQuadrant(0, -1500, 1000, 0);
-	//orderPoints();
-    std::cout << "finished" << endl;
-	int event = 0;
-	event = gPad->GetEvent();
-	
-	if (( i == maxv ) || ( event == 24 )){ //keypresses trigger exit
-		if (i == maxv) {
-        std::cout << "Too many points (keep below " << maxv << ")\n";      
-		}
-		return;
-	}
-	else if (event == 1) {
-		double px = gPad->GetEventX();
-		double py = gPad->GetEventY();
-		double xd = gPad->AbsPixeltoX(px);
-		double yd = gPad->AbsPixeltoY(py);
-		double x = gPad->PadtoX(xd);
-		double y = gPad->PadtoY(yd);
-		//g2->SetPoint(i,x,y);
-		//g2->Draw("+L");
-		xVertices[i] = x;
-		yVertices[i] = y;
-		//outfile << x << "\t" << y << endl;
-		i = i + 1;
-        std::cout << i << " vertices collected, stop with keypress (avoid double clicks)\n\n";
-        std::cout << "Selected: " << x << "\t" << y << "\n";
-	}
+  gPad->GetCanvas()->FeedbackMode(kTRUE);
+  if (!gPad) {
+  std::cout << "gPad is null" << endl;
+  return;
+  }	
+//checkQuadrant(0, -1500, 1000, 0);
+//orderPoints();
+std::cout << "finished" << endl;
+int event = 0;
+event = gPad->GetEvent();
+
+if (( i == maxv ) || ( event == 24 )){ //keypresses trigger exit
+if (i == maxv) {
+std::cout << "Too many points (keep below " << maxv << ")\n";      
+}
+return;
+}
+else if (event == 1) {
+double px = gPad->GetEventX();
+double py = gPad->GetEventY();
+double xd = gPad->AbsPixeltoX(px);
+double yd = gPad->AbsPixeltoY(py);
+double x = gPad->PadtoX(xd);
+double y = gPad->PadtoY(yd);
+//g2->SetPoint(i,x,y);
+//g2->Draw("+L");
+xVertices[i] = x;
+yVertices[i] = y;
+//outfile << x << "\t" << y << endl;
+i = i + 1;
+std::cout << i << " vertices collected, stop with keypress (avoid double clicks)\n\n";
+std::cout << "Selected: " << x << "\t" << y << "\n";
+}
 }
 */
 int main(int argc, char **argv){
-	//gROOT->SetBatch(kFALSE);
+    //gROOT->SetBatch(kFALSE);
     if (argc < 2)
     {
         std::cerr << "Usage: ./reader file_name" << std::endl;
@@ -496,56 +493,56 @@ int main(int argc, char **argv){
 
     char* fileName = argv[1];
 
-	goodParticles = 0;
-	char ans = 'y'; //default answer is yes
-	TPad* pad1;
-	
-	while (ans=='y')
+    goodParticles = 0;
+    char ans = 'y'; //default answer is yes
+    TPad* pad1;
+
+    while (ans=='y')
     {
-		//gROOT->Reset();
-		//i = 0;	
-		g2 = new TGraph();
-		g2->SetFillColor(6);
+        //gROOT->Reset();
+        //i = 0;	
+        g2 = new TGraph();
+        g2->SetFillColor(6);
         std::cout << "\nWould you like to choose vertex points? \t y/n: ";
         std::cin >> ans;
-	  		
 
-		if (ans=='y')
+
+        if (ans=='y')
         {
             std::cout << "What z position would you like to examine?" << std::endl;
             std::cin >> z_pos;
-			
-			TCanvas* c2 = new TCanvas("c2","points display", 10, 10, 1600, 900);
-			c2->ToggleEventStatus();
-			pad1 = new TPad("pad1","pad1",.1,.1,.9,.9);
-			//pad1->Draw();
-			goodParticles = countTextFile(z_pos, fileName);
-			particlesX = new double[goodParticles];
-			particlesY = new double[goodParticles];
-			readTextFile(z_pos, fileName);
-		
+
+            TCanvas* c2 = new TCanvas("c2","points display", 10, 10, 1600, 900);
+            c2->ToggleEventStatus();
+            pad1 = new TPad("pad1","pad1",.1,.1,.9,.9);
+            //pad1->Draw();
+            goodParticles = countTextFile(z_pos, fileName);
+            particlesX = new double[goodParticles];
+            particlesY = new double[goodParticles];
+            readTextFile(z_pos, fileName);
+
             std::cout << "Number of points displayed: " << goodParticles << "\n";
-			if (goodParticles >= 1){
+            if (goodParticles >= 1){
                 TGraph *particleGraph = new TGraph(goodParticles,particlesX,particlesY);
-				gPad->Modified();
-				gPad->Update();
-				// do user interactions here:
-				if (!gPad) {
+                gPad->Modified();
+                gPad->Update();
+                // do user interactions here:
+                if (!gPad) {
                     std::cout << "pad1 is null" << std::endl;
-					//break;
-				}	
-				//g2->SetPoint(g2->GetN(), -9999, 0);
-				double xMax, xMin, yMax, yMin;
+                    //break;
+                }	
+                //g2->SetPoint(g2->GetN(), -9999, 0);
+                double xMax, xMin, yMax, yMin;
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
 
                 double area = (xMax - xMin * yMax - yMin);
                 minArea = area/100000;
                 criticalPoints = (goodParticles/area) / 100; //% of the particles/area
                 checkQuadrant(xMax, xMin, yMax, yMin);
-				//hull = orderPoints(particleGraph, 50);
-				hull = orderPoints(g2, 30);
+                //hull = orderPoints(particleGraph, 50);
+                hull = orderPoints(g2, 30);
                 //hull = new TGraph();
-                
+
                 std::cout << "Hull points: " << hull->GetN() << std::endl;
                 for (int j = 0; j < hull->GetN(); j++)
                 {
@@ -553,17 +550,17 @@ int main(int argc, char **argv){
                     hull->GetPoint(j, x, y);
                     //std::cout << x << ", " << y << std::endl;
                 }
-				particleGraph->SetMarkerStyle(6);
-				particleGraph->SetMarkerColor(4);
+                particleGraph->SetMarkerStyle(6);
+                particleGraph->SetMarkerColor(4);
                 g2->SetMarkerStyle(6);
                 g2->SetMarkerColor(6);
                 hull->SetLineColor(2);
-				
+
                 //FIXME
                 hull->Draw("AL");
                 particleGraph->Draw("AP");
                 //g2->Draw("Psame");
-				//particleGraph->Draw("Psame");
+                //particleGraph->Draw("Psame");
                 hull->Draw("Lsame");
 
                 std::cout << "Considered points: " << g2->GetN() << std::endl;
@@ -573,27 +570,27 @@ int main(int argc, char **argv){
                     g2->GetPoint(j, x, y);
                     //std::cout << x << ", " << y << std::endl;
                 } 
-				//g2->SetPoint(g2->GetN(), 9999, 0);
-				
+                //g2->SetPoint(g2->GetN(), 9999, 0);
+
                 /*
-                particleGraph->Draw("A");
-                mg->Draw("Fsame");
-                particleGraph->Draw("Psame");
-                g2->Draw("Psame");
-                */
+                   particleGraph->Draw("A");
+                   mg->Draw("Fsame");
+                   particleGraph->Draw("Psame");
+                   g2->Draw("Psame");
+                   */
                 gPad->Modified();
-				gPad->Update();
-                
+                gPad->Update();
+
                 /*
-                    
-				char ans2 = 'y';
-				while (true) {
-                std::cout << "Do you want to save these " << i << " points?\ty/n: ";
-					cin >> ans2;
-				}
-				// DONE
-				particleGraph->Delete();
-			*/
+
+                   char ans2 = 'y';
+                   while (true) {
+                   std::cout << "Do you want to save these " << i << " points?\ty/n: ";
+                   cin >> ans2;
+                   }
+                // DONE
+                particleGraph->Delete();
+                */
                 std::cout << "Done with z = " << z_pos << std::endl;
                 TCanvas *imgCanvas = new TCanvas();
                 imgCanvas->cd();
@@ -602,23 +599,36 @@ int main(int argc, char **argv){
                 TImage *img = TImage::Create();
                 img->FromPad(imgCanvas);
                 img->WriteImage("test.png");
-			}
+                
+                char filenameO[50];
+                ofstream outfile;
+                sprintf(filenameO, "vertex_storage.txt");
+                outfile.open(filenameO,std::ios::app);
+                outfile << "-999999\t" << z_pos << "\n";
+                double hullX, hullY;
+                for (int k = 0; k < hull->GetN(); k++) {
+                    hull->GetPoint(k, hullX, hullY);
+                    outfile << hullX << "\t" << hullY << std::endl;
+                }	
+                std::cout << "Stored " << hull->GetN() << " x and y coordinates at z = " << z_pos << std::endl;
+                outfile.close();
+            }
 
-			else {
+            else {
                 std::cout << "Sorry, the file you have chosen is empty, please try again" << std::endl;
-			}
-			delete particlesX;
-			delete particlesY;
-			//gPad->Delete();
-			//pad2->Delete();
-		//	c2->Delete();
-			particlesX = NULL;
-			particlesY = NULL;
-		}
-		else if (( ans != 'y' ) && ( ans != 'n' )) {
-            std::cout << "Error, please try again using the characters 'y' and 'n'" << std::endl;
-			ans = 'y';
+            }
+            delete particlesX;
+            delete particlesY;
+            //gPad->Delete();
+            //pad2->Delete();
+            //	c2->Delete();
+            particlesX = NULL;
+            particlesY = NULL;
         }
-	}
+        else if (( ans != 'y' ) && ( ans != 'n' )) {
+            std::cout << "Error, please try again using the characters 'y' and 'n'" << std::endl;
+            ans = 'y';
+        }
+    }
     return 0;
 }
