@@ -21,8 +21,8 @@ const int maxv = 20;
 double minArea; //minimum area unit considered. smaller = less sensitive
 double criticalPoints; //hits treated as zero. smaller = more sensitive
 
-double* particlesX;
-double* particlesY;
+std::vector<double> particlesX;
+std::vector<double> particlesY;
 
 int goodParticles;
 
@@ -31,7 +31,9 @@ int countTextFile(int thisZ, char* filename) {
     std::vector < remollEventParticle_t > *particle = 0;
     TFile f(filename);
     TTree *tree = (TTree*)f.Get("T");
-    tree->Print();
+    //tree->Print();
+    //TODO reading data into envelopes downstream could be sped up
+    //by storing the data by Z instead of by hit
     tree->SetBranchAddress("part", &particle); 
     for (int i = 0; i < tree->GetEntries(); i++)
     {
@@ -48,14 +50,14 @@ int countTextFile(int thisZ, char* filename) {
                 }
             }
         }
-    }	
+    }
+    std::cout << "Good Particles: " << tempGoodParticles << std::endl;
     return tempGoodParticles;	
 }
 
 
 
 void readTextFile(int thisZ, char* filename){
-    int tempGoodParticles = 0;
     std::vector < remollEventParticle_t > *particle = 0;
     TFile f(filename);
     TTree *tree = (TTree*)f.Get("T");
@@ -68,15 +70,15 @@ void readTextFile(int thisZ, char* filename){
             std::vector < double > *x = &particle->at(j).tjx;
             std::vector < double > *y = &particle->at(j).tjy;
             std::vector < double > *z = &particle->at(j).tjz; 
-            std::cout << "check size x " << x->size() << " " << __LINE__ << std::endl;
-            std::cout << "check size y " << y->size() << " " << __LINE__ << std::endl;
-            std::cout << "check size z " << z->size() << " " << __LINE__ << std::endl;
+            //std::cout << "check size x " << x->size() << " " << __LINE__ << std::endl;
+            //std::cout << "check size y " << y->size() << " " << __LINE__ << std::endl;
+            //std::cout << "check size z " << z->size() << " " << __LINE__ << std::endl;
             for (size_t k = 0; k < z->size(); k++)
             {
                 if (z->at(k) == thisZ)
                 {
-                    particlesX[tempGoodParticles] = x->at(k);
-                    particlesY[tempGoodParticles++] = y->at(k);
+                    particlesX.push_back(x->at(k));
+                    particlesY.push_back(y->at(k));
                     break;
                 }
             }
@@ -116,7 +118,7 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
     if (countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
     {
         //space is not in the envelope
-        std::cout << "drawing" << std::endl;
+        //std::cout << "drawing" << std::endl;
         TGraph *g3 = new TGraph();
         g3->SetPoint(0, rightBound, upperBound);
         g3->SetPoint(1, rightBound, lowerBound);
@@ -126,14 +128,14 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
         mg->Add(g3);
         if (area <= 4*minArea)
         {
-            std::cout << "point" << std::endl;
+            //std::cout << "point" << std::endl;
             g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/2));
             return;
         }
     }
     else //enough points to not be noise
     { 	//but where are those points?
-        std::cout << "recur" << std::endl;
+        //std::cout << "recur" << std::endl;
         checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound); //bot  left	
         checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound); //bot right	
         checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2)); //top left	
@@ -437,8 +439,8 @@ TGraph* orderPoints(TGraph* pointList, int k)
         step++;
     }
     //std::cout << "check 3" << std::endl;
-    //FIXME 95% of points?
-    bool allInside = !(abs(getPointsEnclosed(hull)) <= (0.94 * goodParticles));
+    //FIXME 75% of points?
+    bool allInside = !(abs(getPointsEnclosed(hull)) <= (0.75 * goodParticles));
     std::cout << getPointsEnclosed(hull) << "/" << goodParticles << std::endl;
     if (!allInside){
         std::cout << "Enclose more points" << std::endl;
@@ -447,50 +449,27 @@ TGraph* orderPoints(TGraph* pointList, int k)
     return hull;
 }
 
-/*void DynamicCoordinates() {
-  gPad->GetCanvas()->FeedbackMode(kTRUE);
-  if (!gPad) {
-  std::cout << "gPad is null" << endl;
-  return;
-  }	
-//checkQuadrant(0, -1500, 1000, 0);
-//orderPoints();
-std::cout << "finished" << endl;
-int event = 0;
-event = gPad->GetEvent();
-
-if (( i == maxv ) || ( event == 24 )){ //keypresses trigger exit
-if (i == maxv) {
-std::cout << "Too many points (keep below " << maxv << ")\n";      
-}
-return;
-}
-else if (event == 1) {
-double px = gPad->GetEventX();
-double py = gPad->GetEventY();
-double xd = gPad->AbsPixeltoX(px);
-double yd = gPad->AbsPixeltoY(py);
-double x = gPad->PadtoX(xd);
-double y = gPad->PadtoY(yd);
-//g2->SetPoint(i,x,y);
-//g2->Draw("+L");
-xVertices[i] = x;
-yVertices[i] = y;
-//outfile << x << "\t" << y << endl;
-i = i + 1;
-std::cout << i << " vertices collected, stop with keypress (avoid double clicks)\n\n";
-std::cout << "Selected: " << x << "\t" << y << "\n";
-}
-}
-*/
 int main(int argc, char **argv){
     //gROOT->SetBatch(kFALSE);
-    if (argc < 2)
+    if (argc != 2 && argc != 5)
     {
-        std::cerr << "Usage: ./reader file_name" << std::endl;
+        std::cerr << "Usage: ./reader file_name [startZ stopZ step])" << std::endl;
         exit(0);
     }
-
+    double startZ;
+    double stopZ;
+    double step;
+    double currZ;
+    bool noInput = false;
+    if (argc == 5)
+    {
+        noInput = true;
+        startZ = atoi(argv[2]); 
+        stopZ = atoi(argv[3]); 
+        step = atoi(argv[4]); 
+        currZ = startZ;
+    }
+    
     char* fileName = argv[1];
 
     goodParticles = 0;
@@ -503,27 +482,54 @@ int main(int argc, char **argv){
         //i = 0;	
         g2 = new TGraph();
         g2->SetFillColor(6);
-        std::cout << "\nWould you like to choose vertex points? \t y/n: ";
-        std::cin >> ans;
-
+        if (noInput)
+        {
+            if (currZ > stopZ)
+                ans = 'n';
+            else
+                ans = 'y';
+        }
+        else
+        {
+            std::cout << "\nWould you like to choose vertex points? \t y/n: ";
+            std::cin >> ans;
+        }
 
         if (ans=='y')
         {
-            std::cout << "What z position would you like to examine?" << std::endl;
-            std::cin >> z_pos;
-
+            if (noInput)
+            {
+                z_pos = currZ;
+                currZ += step;
+            }
+            else
+            {
+                std::cout << "What z position would you like to examine?" << std::endl;
+                std::cin >> z_pos;
+            }
+            std::cout << "Starting at z=" << z_pos << std::endl;
             TCanvas* c2 = new TCanvas("c2","points display", 10, 10, 1600, 900);
-            c2->ToggleEventStatus();
             pad1 = new TPad("pad1","pad1",.1,.1,.9,.9);
             //pad1->Draw();
-            goodParticles = countTextFile(z_pos, fileName);
-            particlesX = new double[goodParticles];
-            particlesY = new double[goodParticles];
-            readTextFile(z_pos, fileName);
+            //std::cout << "Counting... ";
+            //goodParticles = countTextFile(z_pos, fileName);
+            //std::cout << "Done" << std::endl;
+            std::cout << "Reading... ";
+            particlesX.clear();
+            particlesY.clear();
 
-            std::cout << "Number of points displayed: " << goodParticles << "\n";
+            readTextFile(z_pos, fileName);
+            if (particlesX.size() != particlesY.size())
+            {
+                std::cerr << "X and Y data sizes mismatched" << std::endl;
+                exit(1);
+            }
+            goodParticles = particlesX.size();
+            std::cout << "Done" << std::endl;
+
+            std::cout << "Number of points read: " << goodParticles << "\n";
             if (goodParticles >= 1){
-                TGraph *particleGraph = new TGraph(goodParticles,particlesX,particlesY);
+                TGraph *particleGraph = new TGraph(goodParticles,&particlesX[0],&particlesY[0]);
                 gPad->Modified();
                 gPad->Update();
                 // do user interactions here:
@@ -538,7 +544,9 @@ int main(int argc, char **argv){
                 double area = (xMax - xMin * yMax - yMin);
                 minArea = area/100000;
                 criticalPoints = (goodParticles/area) / 100; //% of the particles/area
+                std::cout << "Generating...";
                 checkQuadrant(xMax, xMin, yMax, yMin);
+                std::cout << "Done" << std::endl;
                 //hull = orderPoints(particleGraph, 50);
                 hull = orderPoints(g2, 30);
                 //hull = new TGraph();
@@ -617,13 +625,6 @@ int main(int argc, char **argv){
             else {
                 std::cout << "Sorry, the file you have chosen is empty, please try again" << std::endl;
             }
-            delete particlesX;
-            delete particlesY;
-            //gPad->Delete();
-            //pad2->Delete();
-            //	c2->Delete();
-            particlesX = NULL;
-            particlesY = NULL;
         }
         else if (( ans != 'y' ) && ( ans != 'n' )) {
             std::cout << "Error, please try again using the characters 'y' and 'n'" << std::endl;
