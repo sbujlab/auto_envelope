@@ -20,6 +20,8 @@ TGraph* hull;
 const int maxv = 20;
 double minArea; //minimum area unit considered. smaller = less sensitive
 double criticalPoints; //hits treated as zero. smaller = more sensitive
+double maxArea; //max area to prevent too large of a cut
+int startK = 50; //starting number of points to look at. Higher is a smoother hull
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -115,7 +117,7 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
     {
         return;
     }
-    if (countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
+    if (area <= maxArea/16 && countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
     {
         //space is not in the envelope
         //std::cout << "drawing" << std::endl;
@@ -542,13 +544,14 @@ int main(int argc, char **argv){
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
 
                 double area = (xMax - xMin * yMax - yMin);
-                minArea = area/100000;
-                criticalPoints = (goodParticles/area) / 100; //% of the particles/area
+                maxArea = area;
+                minArea = 0.025 * area/100000;
+                criticalPoints = 25*(goodParticles/area) / 100; //% of the particles/area
                 std::cout << "Generating...";
                 checkQuadrant(xMax, xMin, yMax, yMin);
                 std::cout << "Done" << std::endl;
                 //hull = orderPoints(particleGraph, 50);
-                hull = orderPoints(g2, 30);
+                hull = orderPoints(g2, startK);
                 //hull = new TGraph();
 
                 std::cout << "Hull points: " << hull->GetN() << std::endl;
