@@ -21,7 +21,7 @@ const int maxv = 20;
 double minArea; //minimum area unit considered. smaller = less sensitive
 double criticalPoints; //hits treated as zero. smaller = more sensitive
 double maxArea; //max area to prevent too large of a cut
-int startK = 50; //starting number of points to look at. Higher is a smoother hull
+int startK = 300; //starting number of points to look at. Higher is a smoother hull
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -545,8 +545,13 @@ int main(int argc, char **argv){
 
                 double area = (xMax - xMin * yMax - yMin);
                 maxArea = area;
-                minArea = 0.025 * area/100000;
-                criticalPoints = 25*(goodParticles/area) / 100; //% of the particles/area
+                minArea = 0.00025;// * area/100000;
+                criticalPoints = (goodParticles/area); //% of the particles/area
+                std::cout << "Parameters: " << std::endl;
+                std::cout << "\tmaxArea: " << maxArea << std::endl;
+                std::cout << "\tminArea: " << minArea << std::endl;
+                std::cout << "\tcritPoints: " << criticalPoints << std::endl;
+                std::cout << "\tstartK: " << startK << std::endl;
                 std::cout << "Generating...";
                 checkQuadrant(xMax, xMin, yMax, yMin);
                 std::cout << "Done" << std::endl;
@@ -609,11 +614,23 @@ int main(int argc, char **argv){
                 particleGraph->Draw("Psame");
                 TImage *img = TImage::Create();
                 img->FromPad(imgCanvas);
+                
+                std::string fileString(fileName); 
+                int dotPos = fileString.rfind(".");   
+                
+                std::ostringstream os;
+                os << fileString.substr(0, dotPos) << "_" << z_pos << ".png";
+                std::string imgName = os.str();
+                img->WriteImage(imgName.c_str());
                 img->WriteImage("test.png");
+                
+                std::ostringstream vos;
+                vos << fileString.substr(0, dotPos) << "_vertex_storage.txt";
+                std::string storageName = vos.str();
                 
                 char filenameO[50];
                 ofstream outfile;
-                sprintf(filenameO, "vertex_storage.txt");
+                sprintf(filenameO, storageName.c_str());
                 outfile.open(filenameO,std::ios::app);
                 outfile << "-999999\t" << z_pos << "\n";
                 double hullX, hullY;
