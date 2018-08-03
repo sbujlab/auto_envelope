@@ -17,11 +17,11 @@ int z_pos = 0; //default starting position is z=0
 TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
-const int maxv = 20;
+const int maxv = 100;
 double minArea; //minimum area unit considered. smaller = less sensitive
 double criticalPoints; //hits treated as zero. smaller = more sensitive
 double maxArea; //max area to prevent too large of a cut
-int startK = 300; //starting number of points to look at. Higher is a smoother hull
+int startK = 2000; //starting number of points to look at. Higher is a smoother hull
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -117,7 +117,8 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
     {
         return;
     }
-    if (area <= maxArea/16 && countPointsInBounds(rightBound, leftBound, upperBound, lowerBound)/area <= criticalPoints)
+    int nPoints = countPointsInBounds(rightBound, leftBound, upperBound, lowerBound);
+    if (nPoints == 0 || (area <= maxArea && nPoints/area <= criticalPoints))
     {
         //space is not in the envelope
         //std::cout << "drawing" << std::endl;
@@ -361,6 +362,11 @@ TGraph* orderPoints(TGraph* pointList, int k)
         {
             data->SetPoint(data->GetN(), tX, tY);
         }
+        if (hull->GetN() > maxv)
+        {
+            std::cout << "Too many vertices. Generating smoother hull..." << std::endl;
+            return orderPoints(pointList, k+1);
+        }
 
         //std::cout << "check 1" << std::endl;
         //get and sort neighbors descending by right hand turn
@@ -433,7 +439,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         kNearestPoints->GetPoint(i, cX, cY);
         //std::cout << "check" << cX << " " << cY << " " << tX << " " << tY << std::endl;
         hull->SetPoint(hull->GetN(), cX, cY);
-
+        
         //prevAngle = getAngle(hull, step, step-1);
         hull->GetPoint(hull->GetN()-2, prevX, prevY); 
 
@@ -441,8 +447,8 @@ TGraph* orderPoints(TGraph* pointList, int k)
         step++;
     }
     //std::cout << "check 3" << std::endl;
-    //FIXME 75% of points?
-    bool allInside = !(abs(getPointsEnclosed(hull)) <= (0.75 * goodParticles));
+    // 95% of points?
+    bool allInside = !(abs(getPointsEnclosed(hull)) <= (0.95 * goodParticles));
     std::cout << getPointsEnclosed(hull) << "/" << goodParticles << std::endl;
     if (!allInside){
         std::cout << "Enclose more points" << std::endl;
@@ -544,18 +550,28 @@ int main(int argc, char **argv){
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
 
                 double area = (xMax - xMin * yMax - yMin);
-                maxArea = area;
-                minArea = 0.00025;// * area/100000;
-                criticalPoints = (goodParticles/area); //% of the particles/area
-                std::cout << "Parameters: " << std::endl;
-                std::cout << "\tmaxArea: " << maxArea << std::endl;
-                std::cout << "\tminArea: " << minArea << std::endl;
-                std::cout << "\tcritPoints: " << criticalPoints << std::endl;
-                std::cout << "\tstartK: " << startK << std::endl;
-                std::cout << "Generating...";
-                checkQuadrant(xMax, xMin, yMax, yMin);
+                minArea = .1;// * area/100000;
+                maxArea = 1000 * minArea;
+                criticalPoints = 1.8*(goodParticles/area); //% of the particles/area
+                std::cout << "Generating..." << std::endl;
+                do {
+                    delete g2;
+                    g2 = new TGraph();
+                    delete mg;
+                    mg = new TMultiGraph();
+                    std::cout << "Check points: " << g2->GetN() << std::endl;
+                    std::cout << "Parameters: " << std::endl;
+                    std::cout << "\tmaxArea: " << maxArea << std::endl;
+                    std::cout << "\tminArea: " << minArea << std::endl;
+                    std::cout << "\tcritPoints: " << criticalPoints << std::endl;
+                    std::cout << "\tstartK: " << startK << std::endl;
+                    checkQuadrant(xMax, xMin, yMax, yMin);
+                    std::cout << "Considered points: " << g2->GetN() << std::endl;
+                    criticalPoints*=2;
+                }while (g2->GetN() >= startK*25);
                 std::cout << "Done" << std::endl;
                 //hull = orderPoints(particleGraph, 50);
+                startK = (startK > g2->GetN()) ? g2->GetN() /2 : startK;
                 hull = orderPoints(g2, startK);
                 //hull = new TGraph();
 
@@ -579,7 +595,6 @@ int main(int argc, char **argv){
                 //particleGraph->Draw("Psame");
                 hull->Draw("Lsame");
 
-                std::cout << "Considered points: " << g2->GetN() << std::endl;
                 for (int j = 0; j < g2->GetN(); j++)
                 {
                     double x, y;
@@ -612,6 +627,7 @@ int main(int argc, char **argv){
                 imgCanvas->cd();
                 hull->Draw("AL");
                 particleGraph->Draw("Psame");
+                //mg->Draw("LFsame"); 
                 TImage *img = TImage::Create();
                 img->FromPad(imgCanvas);
                 
