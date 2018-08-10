@@ -18,8 +18,8 @@ TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
 const int maxv = 100;
-double minArea = 15.0; //minimum area unit considered. smaller = less sensitive
-double criticalPoints = 1; //hits treated as zero. smaller = more sensitive
+double minArea = 30.0; //minimum area unit considered. smaller = less sensitive
+double criticalPoints = 2; //hits treated as zero. smaller = more sensitive
 double maxArea = 10 * minArea; //max area to prevent too large of a cut
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
 double cut = 15; //high density cut
@@ -115,7 +115,7 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
     //std::cout << "lower:" << lowerBound << std::endl;
     int nPoints = countPointsInBounds(rightBound, leftBound, upperBound, lowerBound);
     double density = nPoints/area;
-    if (area <= minArea || g2->GetN() >= pointLimit || (nPoints == 0 || (area <= maxArea && density < densityCut)))
+    if (g2->GetN() >= pointLimit || (nPoints == 0 || (area <= maxArea && density < densityCut)))
     {
         TGraph *g3 = new TGraph();
         g3->SetPoint(0, rightBound, upperBound);
@@ -132,12 +132,13 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
     else //enough points to not be noise
     { 	//but where are those points?
         //std::cout << "recur" << std::endl;
+        if (4*area <= minArea) return density;
         double d[4];
         d[0] = checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound, pointLimit); //bot  left	
         d[1] = checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound, pointLimit); //bot right	
         d[2] = checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2), pointLimit); //top left	
         d[3] = checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound, upperBound - (yDelta/2), pointLimit); //top right	
-        if (area <= 4 * minArea)
+        if (area <= minArea)
         {
             /*std::cout << "Point checking " << std::endl;
             for (int i = 0; i <4 ; i ++)
@@ -644,7 +645,8 @@ int main(int argc, char **argv){
                 yMax = res[3];
                 yMin = res[4];
                 
-                std::cout << "Width to height: " << (xMax-xMin) / (yMax-yMin) << std::endl;
+                double heightRatio = (yMax-yMin) / (xMax-xMin);;
+                std::cout << "Height to Width: " << heightRatio << std::endl;
                 /*double oldMinDensity = densityCut;
                 double oldMaxDensity = cut; 
                 densityCut = densityCut/area;               
@@ -652,8 +654,8 @@ int main(int argc, char **argv){
                 */
                 double oldMin = minArea;
                 //minArea *= sqrt(area);
-                maxArea = 10 * minArea;
-                cut = 10*goodParticles/area;
+                maxArea =  2*minArea;
+                cut = 3*goodParticles/area;
                 densityCut = 0;//cut/20.0;
                if (cut < 5) 
                {
@@ -679,23 +681,78 @@ int main(int argc, char **argv){
                     std::cout << "\tpointLimit: " << pointLimit << std::endl;
                     std::cout << "\tHighDensityCut: " << cut << std::endl;
                     std::cout << "\tLowDensityCut: " << densityCut << std::endl;
-                    checkQuadrant(xMax, xMin, yMax, yMax/2, pointLimit/2);
-                    checkQuadrant(xMax, xMin, yMax/2, yMin, pointLimit);
+                    int cutTimes = ((int)heightRatio)+1;
+                    double range = (yMax - yMin)/cutTimes;
+                    for (int i = 0; i < cutTimes; i++)
+                    {
+                        checkQuadrant(xMax, xMin, yMin+(range/heightRatio)*(i+1), yMin+(range/heightRatio)*(i), pointLimit);
+                    }
                     std::cout << "Considered points: " << g2->GetN() << std::endl;
+                    if (g2->GetN() >= pointLimit)
+                        break;
                     hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
                     std::cout << "Resultant points: " << hull->GetN() << std::endl;
-
+                    
                 }while (false && hull->GetN() <= 10);
                 std::cout << "Done" << std::endl;
+                int leftIndex = 0;
+                int rightIndex = 0;
+                double leftX;
+                double rightX;
+                bool first = true;
                 for (int j = 0; j < hull->GetN(); j++)
                 {
                     double x, y;
                     hull->GetPoint(j, x, y);
-                    if (y < 2)
+                    
+                    if (y < 5)
+                    {
                         hull->SetPoint(j, x, 0);
-                        //std::cout << x << ", " << y << std::endl;
+                        if (first)
+                        {
+                            std::cout << "first" << std::endl;
+                            first = false;
+                            rightIndex = j;
+                            leftX = x;
+                            rightX = x;
+                            leftIndex = j;
+                            std::cout << "l, r: " << leftIndex << ", " << rightIndex << std::endl;
+                        }
+                        else
+                        {
+                             if (leftX > x)
+                             {
+                                leftX = x;
+                                leftIndex = j;
+                             }
+                             if (rightX < x)
+                             {
+                                rightX = x;
+                                rightIndex = j;
+                             }
+                        }
+                    } 
                 } 
-
+                for (int j = 0; j < hull->GetN()-1; j++)
+                {
+                    if (j == leftIndex || j == rightIndex) 
+                    {
+                        double x, y;
+                        hull->GetPoint(j, x, y);
+                        std::cout << "Saving " << j << ": " << x << ", " << y << std::endl;
+                        continue;
+                    }
+                    double x, y;
+                    hull->GetPoint(j, x, y);
+                    
+                    if (y < 5)
+                    {
+                        std::cout << "Removing " << j << ": " << x << ", " << y << std::endl;
+                        hull->RemovePoint(j--);
+                        leftIndex--;
+                        rightIndex--;
+                    }
+                }
                 //int currK = (startK > g2->GetN() * 2/4)? g2->GetN() * 2/4 : startK;
                 //hull = orderPoints(g2, currK);
 
