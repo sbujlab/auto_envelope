@@ -18,10 +18,12 @@ TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
 const int maxv = 100;
-double minArea; //minimum area unit considered. smaller = less sensitive
-double criticalPoints; //hits treated as zero. smaller = more sensitive
-double maxArea; //max area to prevent too large of a cut
-int startK = 2000; //starting number of points to look at. Higher is a smoother hull
+double minArea = 100.0; //minimum area unit considered. smaller = less sensitive
+double criticalPoints = 1; //hits treated as zero. smaller = more sensitive
+double maxArea = 10 * minArea; //max area to prevent too large of a cut
+int startK = 30; //starting number of points to look at. Higher is a smoother hull
+double cut = 15; //high density cut
+double densityCut = 0; //low density cut
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -96,12 +98,10 @@ int countPointsInBounds(double rightBound, double leftBound, double upperBound, 
     {
         if (particlesX[i] < rightBound && particlesX[i] > leftBound && particlesY[i] < upperBound && particlesY[i] > lowerBound)
             count++;
-        //std::cout << "X: " << particlesX[i] << std::endl << "Y: :" << particlesY[i] << std::endl;
     }
     return count;
 }
-
-void checkQuadrant(double rightBound, double leftBound, double upperBound, double lowerBound)
+double checkQuadrant(double rightBound, double leftBound, double upperBound, double lowerBound, int pointLimit)
 {
     double xDelta = rightBound - leftBound;
     double yDelta = upperBound - lowerBound;
@@ -113,38 +113,67 @@ void checkQuadrant(double rightBound, double leftBound, double upperBound, doubl
     //std::cout << "left:" << leftBound << std::endl;
     //std::cout << "upper:" << upperBound << std::endl;
     //std::cout << "lower:" << lowerBound << std::endl;
-    if (area <= minArea)
-    {
-        return;
-    }
     int nPoints = countPointsInBounds(rightBound, leftBound, upperBound, lowerBound);
-    if (nPoints == 0 || (area <= maxArea && nPoints/area <= criticalPoints))
+    double density = nPoints/area;
+    if (area <= minArea || g2->GetN() >= pointLimit || (nPoints == 0 || (area <= maxArea && density < densityCut)))
     {
-        //space is not in the envelope
-        //std::cout << "drawing" << std::endl;
         TGraph *g3 = new TGraph();
         g3->SetPoint(0, rightBound, upperBound);
         g3->SetPoint(1, rightBound, lowerBound);
         g3->SetPoint(2, leftBound, lowerBound);
         g3->SetPoint(3, leftBound, upperBound);
-        g3->SetFillColor(rand() % 100 + 1);
+        int densityColor = (int)(density  * 100);
+        if (densityColor <= 1) densityColor =2;
+        if (densityColor >= 100) densityColor =99;
+        g3->SetFillColor(densityColor);
         mg->Add(g3);
-        if (area <= 4*minArea)
-        {
-            //std::cout << "point" << std::endl;
-            g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/2));
-            return;
-        }
+        return density;
     }
     else //enough points to not be noise
     { 	//but where are those points?
         //std::cout << "recur" << std::endl;
-        checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound); //bot  left	
-        checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound); //bot right	
-        checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2)); //top left	
-        checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound, upperBound - (yDelta/2)); //top right	
-
+        double d[4];
+        d[0] = checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound, pointLimit); //bot  left	
+        d[1] = checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound, pointLimit); //bot right	
+        d[2] = checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound, upperBound - (yDelta/2), pointLimit); //top left	
+        d[3] = checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound, upperBound - (yDelta/2), pointLimit); //top right	
+        if (area <= 4 * minArea)
+        {
+            /*std::cout << "Point checking " << std::endl;
+            for (int i = 0; i <4 ; i ++)
+                std::cout << i << ": " << d[i] << std::endl;
+            */
+            // across bot
+            if ((d[0] < cut || d[1] < cut) && abs(d[0] - d[1]) >= criticalPoints)
+            {
+                g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), lowerBound + (yDelta/4));
+            }
+            // across left
+            if ((d[0] < cut || d[2] < cut) && abs(d[0] - d[2]) >= criticalPoints)
+            {
+                g2->SetPoint(g2->GetN(), leftBound + (xDelta/4), lowerBound + (yDelta/2));
+            }
+            // across diags
+            if ( ( (d[0] < cut || d[3] < cut) && abs(d[0] - d[3]) >= criticalPoints) 
+                    || ((d[1] < cut || d[2] < cut) && abs(d[1] - d[2]) > criticalPoints))
+            {
+                g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), lowerBound + (yDelta/2));
+            }
+            // across right
+            if ((d[1] < cut || d[3] < cut) && abs(d[1] - d[3]) >= criticalPoints)
+            {
+                g2->SetPoint(g2->GetN(), rightBound - (xDelta/4), lowerBound + (yDelta/2));
+            }
+            // across top
+            if ((d[2] < cut || d[3] < cut) && abs(d[2] - d[3]) >= criticalPoints)
+            {
+                g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/4));
+            }
+            //std::cout << g2->GetN() << std::endl;
+        }
     }
+    //std::cout << "Density: " << density << std::endl;
+    return density;
 }
 
 bool isCounterClockwise(double p1x, double p1y, double p2x, double p2y, double p3x, double p3y )
@@ -457,11 +486,54 @@ TGraph* orderPoints(TGraph* pointList, int k)
     return hull;
 }
 
+double* get99Area(double xMax, double xMin, double yMax, double yMin)
+{
+    int currPoints = countPointsInBounds(xMax, xMin, yMax, yMin);
+    int pointGoal = .998 * currPoints;
+    double step = 1;
+    
+    while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
+    {
+        xMax -= step;
+    }
+    xMax += 2*step;
+    while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
+    {
+        xMin += step;
+    }
+    xMin -= 2*step;
+    while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
+    {
+        yMax -= step;
+    }
+    yMax += 2*step;
+    while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
+    {
+        yMin += step;
+    }
+    
+    xMax += 8*step;
+    xMin -= 8*step;
+    yMax += 8*step;
+    yMin -= 8*step;
+    std::cout << "xMin : " << xMin << std::endl;
+    std::cout << "xMax : " << xMax << std::endl;
+    std::cout << "yMin : " << yMin << std::endl;
+    std::cout << "yMax : " << yMax << std::endl;
+    double* res = new double[5];
+    res[0] = ((xMax - xMin) * (yMax - yMin));
+    res[1] = xMax;
+    res[2] = xMin;
+    res[3] = yMax;
+    res[4] = yMin;
+    return res;
+}
+
 int main(int argc, char **argv){
     //gROOT->SetBatch(kFALSE);
-    if (argc != 2 && argc != 5)
+    if (argc != 2 && argc != 3 && argc != 5 && argc != 8)
     {
-        std::cerr << "Usage: ./reader file_name [startZ stopZ step])" << std::endl;
+        std::cerr << "Usage: ./reader file_name [startZ <stopZ step [startK minArea criticalPoints]>])" << std::endl;
         exit(0);
     }
     double startZ;
@@ -469,13 +541,27 @@ int main(int argc, char **argv){
     double step;
     double currZ;
     bool noInput = false;
-    if (argc == 5)
+    if (argc == 3)
+    {
+        noInput = true;
+        startZ = atoi(argv[2]); 
+        stopZ = startZ; 
+        step = 1; 
+        currZ = startZ;
+    }
+    if (argc == 5 || argc == 8)
     {
         noInput = true;
         startZ = atoi(argv[2]); 
         stopZ = atoi(argv[3]); 
         step = atoi(argv[4]); 
         currZ = startZ;
+        if (argc == 8)
+        {
+            startK = atof(argv[5]);
+            minArea = atof(argv[6]);
+            criticalPoints = atof(argv[7]);
+        }
     }
     
     char* fileName = argv[1];
@@ -549,14 +635,39 @@ int main(int argc, char **argv){
                 double xMax, xMin, yMax, yMin;
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
 
-                double area = (xMax - xMin * yMax - yMin);
-                minArea = .1;// * area/100000;
-                maxArea = 1000 * minArea;
-                criticalPoints = 1.8*(goodParticles/area); //% of the particles/area
                 std::cout << "Generating..." << std::endl;
+
+                double* res = get99Area(xMax, xMin, yMax, yMin);
+                double area = res[0];
+                xMax = res[1];
+                xMin = res[2];
+                yMax = res[3];
+                yMin = res[4];
+                
+                std::cout << "Width to height: " << (xMax-xMin) / (yMax-yMin) << std::endl;
+                /*double oldMinDensity = densityCut;
+                double oldMaxDensity = cut; 
+                densityCut = densityCut/area;               
+                cut = cut/area;               
+                */
+                double oldMin = minArea;
+                //minArea *= sqrt(area);
+                maxArea = 10 * minArea;
+                cut = 10*goodParticles/area;
+                densityCut = 0;//cut/20.0;
+               if (cut < 5) 
+               {
+                    cut = 5;
+                    std::cerr << "Too low statistics at this Z and area" << std::endl;
+               }
+                std::cout << "Area: " << area << std::endl;
+                int pointLimit = 1000;
                 do {
                     delete g2;
                     g2 = new TGraph();
+                    //g2->SetPoint(0, 0, 0);
+                    //g2->SetPoint(0, xMax, 0);
+                    //g2->SetPoint(1, xMin, 0);
                     delete mg;
                     mg = new TMultiGraph();
                     std::cout << "Check points: " << g2->GetN() << std::endl;
@@ -565,23 +676,34 @@ int main(int argc, char **argv){
                     std::cout << "\tminArea: " << minArea << std::endl;
                     std::cout << "\tcritPoints: " << criticalPoints << std::endl;
                     std::cout << "\tstartK: " << startK << std::endl;
-                    checkQuadrant(xMax, xMin, yMax, yMin);
+                    std::cout << "\tpointLimit: " << pointLimit << std::endl;
+                    std::cout << "\tHighDensityCut: " << cut << std::endl;
+                    std::cout << "\tLowDensityCut: " << densityCut << std::endl;
+                    checkQuadrant(xMax, xMin, yMax, yMax/2, pointLimit/2);
+                    checkQuadrant(xMax, xMin, yMax/2, yMin, pointLimit);
                     std::cout << "Considered points: " << g2->GetN() << std::endl;
-                    criticalPoints*=2;
-                }while (g2->GetN() >= startK*25);
-                std::cout << "Done" << std::endl;
-                //hull = orderPoints(particleGraph, 50);
-                startK = (startK > g2->GetN()) ? g2->GetN() /2 : startK;
-                hull = orderPoints(g2, startK);
-                //hull = new TGraph();
+                    hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
+                    std::cout << "Resultant points: " << hull->GetN() << std::endl;
 
-                std::cout << "Hull points: " << hull->GetN() << std::endl;
+                }while (false && hull->GetN() <= 10);
+                std::cout << "Done" << std::endl;
                 for (int j = 0; j < hull->GetN(); j++)
                 {
                     double x, y;
                     hull->GetPoint(j, x, y);
-                    //std::cout << x << ", " << y << std::endl;
-                }
+                    if (y < 2)
+                        hull->SetPoint(j, x, 0);
+                        //std::cout << x << ", " << y << std::endl;
+                } 
+
+                //int currK = (startK > g2->GetN() * 2/4)? g2->GetN() * 2/4 : startK;
+                //hull = orderPoints(g2, currK);
+
+                //cut = oldMaxDensity;
+                //densityCut = oldMinDensity;
+                minArea = oldMin;
+                maxArea = 10* minArea;
+                std::cout << "Hull points: " << hull->GetN() << std::endl;
                 particleGraph->SetMarkerStyle(6);
                 particleGraph->SetMarkerColor(4);
                 g2->SetMarkerStyle(6);
@@ -595,12 +717,6 @@ int main(int argc, char **argv){
                 //particleGraph->Draw("Psame");
                 hull->Draw("Lsame");
 
-                for (int j = 0; j < g2->GetN(); j++)
-                {
-                    double x, y;
-                    g2->GetPoint(j, x, y);
-                    //std::cout << x << ", " << y << std::endl;
-                } 
                 //g2->SetPoint(g2->GetN(), 9999, 0);
 
                 /*
@@ -625,18 +741,37 @@ int main(int argc, char **argv){
                 std::cout << "Done with z = " << z_pos << std::endl;
                 TCanvas *imgCanvas = new TCanvas();
                 imgCanvas->cd();
+                imgCanvas->Divide(4, 1);
+
+                imgCanvas->cd(1);
                 hull->Draw("AL");
                 particleGraph->Draw("Psame");
-                //mg->Draw("LFsame"); 
+                hull->Draw("Lsame");
+                g2->Draw("Psame");
+
+                imgCanvas->cd(2);
+                g2->Draw("AP");
+                particleGraph->Draw("Psame");
+                g2->Draw("Psame");
+
+                imgCanvas->cd(3);
+                particleGraph->Draw("AP");
+                g2->Draw("Psame");
+
+                imgCanvas->cd(4);
+                mg->Draw("LFsame"); 
+
+                imgCanvas->Draw();
                 TImage *img = TImage::Create();
                 img->FromPad(imgCanvas);
-                
+
                 std::string fileString(fileName); 
                 int dotPos = fileString.rfind(".");   
                 
                 std::ostringstream os;
                 os << fileString.substr(0, dotPos) << "_" << z_pos << ".png";
                 std::string imgName = os.str();
+                
                 img->WriteImage(imgName.c_str());
                 img->WriteImage("test.png");
                 
@@ -648,11 +783,10 @@ int main(int argc, char **argv){
                 ofstream outfile;
                 sprintf(filenameO, storageName.c_str());
                 outfile.open(filenameO,std::ios::app);
-                outfile << "-999999\t" << z_pos << "\n";
                 double hullX, hullY;
                 for (int k = 0; k < hull->GetN(); k++) {
                     hull->GetPoint(k, hullX, hullY);
-                    outfile << hullX << "\t" << hullY << std::endl;
+                    outfile << hullX << "\t" << hullY << "\t" << z_pos << "\r\n";
                 }	
                 std::cout << "Stored " << hull->GetN() << " x and y coordinates at z = " << z_pos << std::endl;
                 outfile.close();
