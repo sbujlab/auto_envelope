@@ -7,7 +7,7 @@ fi
 name="$1"
 let len=${#name}-5
 fname=${name:0:$len}
-for value in {22000..30000..500}
+for value in {6000..30000..500}
 do
     ./reader $name $value
     if [ -e test.png ]

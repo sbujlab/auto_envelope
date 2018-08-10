@@ -18,7 +18,7 @@ TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
 const int maxv = 100;
-double minArea = 100.0; //minimum area unit considered. smaller = less sensitive
+double minArea = 15.0; //minimum area unit considered. smaller = less sensitive
 double criticalPoints = 1; //hits treated as zero. smaller = more sensitive
 double maxArea = 10 * minArea; //max area to prevent too large of a cut
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
