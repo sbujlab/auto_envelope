@@ -1,0 +1,204 @@
+Dim swApp As Object
+Dim Part As Object
+Dim boolstatus As Boolean
+Dim longstatus As Long, longwarnings As Long
+Dim Segment As Object
+Dim myRefPlane As Object
+
+Sub main()
+
+Set swApp = Application.SldWorks
+Set Part = swApp.ActiveDoc
+
+'Store the starting point of the sketch for each z position (X0 Y0 Z0)
+'      the current point being read (X Y Z)
+'      the last point read so it can be connected to the current point (Xp Yp Zp)Dim X As Double
+Dim Y As Double
+Dim Z As Double
+Dim X0 As Double
+Dim Y0 As Double
+Dim Z0 As Double
+Dim Xp As Double
+Dim Yp As Double
+Dim Zp As Double
+X = 0
+Y = 0
+Z = 0
+X0 = 0
+Y0 = 0
+Z0 = 0
+Xp = 0
+Yp = 0
+Zp = 0
+
+'To make a guiding curve for the loft
+'Have to know how many z planes there are - store 3x that many points
+Dim pointArray As Variant
+Dim points() As Double
+ReDim points(0 To 26) As Double
+Dim pointNum As Integer
+pointNum = 0
+
+'Also remember the plane number so it can be referenced later (ie, "Plane1")
+Dim planeNum As Double
+planeNum = 0
+
+
+'It is very important that the newline character is \r\n - CRLF is the only
+'one supported in windows for visual basic.
+Dim FileName As String
+FileName = "C:\Users\Catherine\Documents\remollout_moller_1M_envelope_det28_vertex_storage.txt"
+
+Open FileName For Input As #1
+
+If Not EOF(1) Then
+    'Get the first point to remember where the last point should connect
+    Input #1, X0, Y0, Z0
+    X0 = X0 / 1000  'Units are in mm, so divide by 1000 (macro always reads it in as m)
+    Y0 = Y0 / 1000
+    Z0 = Z0 / 1000
+    Xp = X0
+    Yp = Y0
+    Zp = Z0
+    
+    'points(0) = Xp
+    'points(1) = Yp
+    'points(2) = Zp
+    'pointNum = pointNum + 3
+    
+    'Create a plane at the first point's z position to make the sketch on
+    boolstatus = Part.Extension.SelectByID2("Front", "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+    Set myRefPlane = Part.FeatureManager.InsertRefPlane(8, Z0, 0, 0, 0, 0)
+    planeNum = planeNum + 1
+    Part.ClearSelection2 True
+    
+    'Begin the sketch
+    boolstatus = Part.Extension.SelectByID2("Plane" & CStr(planeNum), "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+    Part.SketchManager.InsertSketch True
+    'Stop lines from snapping to grid when points are close together
+    Part.SetAddToDB True
+    'Part.SetDisplayWhenAdded False
+    Part.ClearSelection2 True
+End If
+
+Do While Not EOF(1)
+    'Get the next point in the file
+    Input #1, X, Y, Z
+    X = X / 1000    'Units are in mm, so divide by 1000 (macro always reads it in as m)
+    Y = Y / 1000
+    Z = Z / 1000
+    
+    'If it's at the same z-position as the previous point, connect the two with a line
+    'Also add another line to mirror it, because the output is folded.
+    If Zp = Z Then
+            Set Segment = Part.SketchManager.CreateLine(Xp, Yp, Zp, X, Y, Z)
+            
+    'Otherwise, connect the last point with the starting point
+    'Create a new sketch plane at the new z position
+    Else
+        'Finish the sketch - connect the last point to the first
+        Set Segment = Part.SketchManager.CreateLine(Xp, Yp, Zp, X0, Y0, Z0)
+        Part.ClearSelection2 True
+        Part.SetAddToDB False
+        'Part.SetDisplayWhenAdded True
+        Part.SketchManager.InsertSketch True
+        Part.ClearSelection2 True
+        
+        'Create new plane
+        boolstatus = Part.Extension.SelectByID2("Front", "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+        Set myRefPlane = Part.FeatureManager.InsertRefPlane(8, Z, 0, 0, 0, 0)
+        planeNum = planeNum + 1
+        Part.ClearSelection2 True
+        
+        'Start next sketch
+        boolstatus = Part.Extension.SelectByID2("Plane" & CStr(planeNum), "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+        Part.SketchManager.InsertSketch True
+        Part.SetAddToDB True
+        'Part.SetDisplayWhenAdded False
+        Part.ClearSelection2 True
+        
+        'points(pointNum) = X
+        'points(pointNum + 1) = Y
+        'points(pointNum + 2) = Z
+        'pointNum = pointNum + 3
+        
+        'This is the new starting point
+        X0 = X
+        Y0 = Y
+        Z0 = Z
+        
+    End If
+
+    'Remember the last point so it can be connected to the next point
+    Xp = X
+    Yp = Y
+    Zp = Z
+Loop
+
+'FInish the sketch
+Set Segment = Part.SketchManager.CreateLine(Xp, Yp, Zp, X0, Y0, Z0)
+
+'Insert the last sketch
+Part.ClearSelection2 True
+Part.SetAddToDB False
+'Part.SetDisplayWhenAdded True
+Part.SketchManager.InsertSketch True
+
+Close #1
+
+
+'For some reason have to reset the plane each sketch is on
+'(probably has to do with adding to database or something)
+Dim i As Integer
+For i = 1 To planeNum
+    boolstatus = Part.Extension.SelectByID2("Sketch" & CStr(i), "SKETCH", 0, 0, 0, False, 0, Nothing, 0)
+    boolstatus = Part.Extension.SelectByID2("Plane" & CStr(i), "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+    boolstatus = Part.ChangeSketchPlane()
+    boolstatus = Part.EditRebuild3()
+Next i
+
+Part.ShowNamedView2 "*Isometric", 7
+Part.ViewZoomtofit2
+
+'Create the guide curve from the loft using the first points of each sketch
+'This line isn't used for lofting yet because it looks a bit weird
+'Part.SketchManager.Insert3DSketch True
+'pointArray = points
+'Dim skSegment As Object
+'Set skSegment = Part.SketchManager.CreateSpline((pointArray))
+'Part.SketchManager.Insert3DSketch True
+
+
+'Now lofting! (This may or may not work)
+MsgBox (planeNum)
+boolstatus = Part.Extension.SelectByID2("Sketch1", "SKETCH", 0, 0, 0, False, 0, Nothing, 0)
+For i = 2 To planeNum
+    boolstatus = Part.Extension.SelectByID2("Sketch" & CStr(i), "SKETCH", 0, 0, 0, True, 0, Nothing, 0)
+Next i
+Part.FeatureManager.InsertProtrusionBlend False, True, False, 1, 6, 6, 1, 1, True, True, False, 0, 0, 0, True, True, True
+Part.ClearSelection2 True
+
+
+'Now mirror the loft!
+boolstatus = Part.Extension.SelectByID2("Top", "PLANE", 0, 0, 0, False, 2, Nothing, 0)
+boolstatus = Part.Extension.SelectByID2("Loft1", "SOLIDBODY", 0, 0, 0, True, 256, Nothing, 0)
+Dim myFeature As Object
+Set myFeature = Part.FeatureManager.InsertMirrorFeature(True, False, False, False)
+Part.ClearSelection2 True
+
+
+'Now make a circular pattern of 7 of them!
+'Make the axis through the origin that the pattern will go around
+boolstatus = Part.Extension.SelectByID2("Point1@Origin", "EXTSKETCHPOINT", 0, 0, 0, True, 0, Nothing, 0)
+boolstatus = Part.Extension.SelectByID2("Plane1", "PLANE", 0, 0, 0, True, 0, Nothing, 0)
+boolstatus = Part.InsertAxis2(True)
+Part.ClearSelection2 True
+
+'Now make the pattern!
+boolstatus = Part.Extension.SelectByID2("Axis1", "AXIS", 0, 0, 0, False, 1, Nothing, 0)
+boolstatus = Part.Extension.SelectByID2("Loft1", "SOLIDBODY", 0, 0, 0, True, 256, Nothing, 0)
+boolstatus = Part.Extension.SelectByID2("Mirror1", "SOLIDBODY", 0, 0, 0, True, 256, Nothing, 0)
+Set myFeature = Part.FeatureManager.FeatureCircularPattern5(7, 6.2831853071796, False, "NULL", False, True, False, False, False, False, 0, 0, "NULL", False)
+
+
+End Sub
