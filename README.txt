@@ -6,6 +6,7 @@ How to use this software suite to take output from a GEANT4 simulation and turn 
 2) Run the output through pruneTreeEnvelope.c (currently in sbujlab/rad_analysis github)
 3) Make and call with ./reader filename to generate an envelope for an input z position
     a) Alternatively, envelope.sh can be edited and used
+    b) reader.c is compiled with "make reader" which requires up-to-date libremoll.so and remolltypes.hh
 4) Plug the vertex_stores.txt file into the SolidWorks VBA macros
 5) Connect the resultant envelopes with a loft (allows connecting ngons)
     a) Catherine's updated version of Tyler's VBA script MakeEnvelopes is in the cadVBA subdirectory
