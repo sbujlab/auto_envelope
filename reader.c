@@ -22,6 +22,7 @@ double minArea = 30.0; //minimum area unit considered. smaller = less sensitive
 double criticalPoints = 2; //hits treated as zero. smaller = more sensitive
 double maxArea = 10 * minArea; //max area to prevent too large of a cut
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
+int stepK = 10;
 double cut = 15; //high density cut
 double densityCut = 0; //low density cut
 
@@ -395,7 +396,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (hull->GetN() > maxv)
         {
             std::cout << "Too many vertices. Generating smoother hull..." << std::endl;
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
 
         //std::cout << "check 1" << std::endl;
@@ -464,7 +465,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (intersects){ //all intersections. Must increase k
             std::cout << "Too many intersections." << std::endl;   
             //return hull ; //FIXME
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
         kNearestPoints->GetPoint(i, cX, cY);
         //std::cout << "check" << cX << " " << cY << " " << tX << " " << tY << std::endl;
@@ -482,7 +483,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
     std::cout << getPointsEnclosed(hull) << "/" << goodParticles << std::endl;
     if (!allInside){
         std::cout << "Enclose more points" << std::endl;
-        return orderPoints(pointList, k+1);
+        return orderPoints(pointList, k+stepK);
     }
     return hull;
 }
