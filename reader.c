@@ -26,6 +26,7 @@ int startK = 30; //starting number of points to look at. Higher is a smoother hu
 //make these density units relative
 double cut = 10.0; //if both squares have a density higher than this, ignore both
 double densityCut = 0.0; //if the square has a density lower than this, ignore it as noise
+int stepK = 10;
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -398,7 +399,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (hull->GetN() > maxv)
         {
             std::cout << "Too many vertices. Generating smoother hull..." << std::endl;
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
 
         //std::cout << "check 1" << std::endl;
@@ -467,7 +468,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (intersects){ //all intersections. Must increase k
             std::cout << "Too many intersections." << std::endl;   
             //return hull ; //FIXME
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
         kNearestPoints->GetPoint(i, cX, cY);
         //std::cout << "check" << cX << " " << cY << " " << tX << " " << tY << std::endl;
@@ -485,7 +486,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
     std::cout << getPointsEnclosed(hull) << "/" << goodParticles << std::endl;
     if (!allInside){
         std::cout << "Enclose more points" << std::endl;
-        return orderPoints(pointList, k+1);
+        return orderPoints(pointList, k+stepK);
     }
     return hull;
 }
