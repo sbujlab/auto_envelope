@@ -17,13 +17,15 @@ int z_pos = 0; //default starting position is z=0
 TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
-const int maxv = 100;
-double minArea = 30.0; //minimum area unit considered. smaller = less sensitive
-double criticalPoints = 2; //hits treated as zero. smaller = more sensitive
-double maxArea = 10 * minArea; //max area to prevent too large of a cut
+const int maxv = 100; //maximum number of points on the hull
+double minArea = 20.0; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
+//TODO edit to make relative
+double criticalPoints = 2.0; //difference in density to register a point. smaller = more points (but noisier)
+double maxArea = 10.0 * minArea; //do not ignore any area larger than this, regardless of density
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
-double cut = 15; //high density cut
-double densityCut = 0; //low density cut
+//make these density units relative
+double cut = 10.0; //if both squares have a density higher than this, ignore both
+double densityCut = 0.0; //if the square has a density lower than this, ignore it as noise
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -144,6 +146,7 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
             for (int i = 0; i <4 ; i ++)
                 std::cout << i << ": " << d[i] << std::endl;
             */
+            //TODO edit to make relative instead of absolute
             // across bot
             if ((d[0] < cut || d[1] < cut) && abs(d[0] - d[1]) >= criticalPoints)
             {
@@ -490,7 +493,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
 double* get99Area(double xMax, double xMin, double yMax, double yMin)
 {
     int currPoints = countPointsInBounds(xMax, xMin, yMax, yMin);
-    int pointGoal = .998 * currPoints;
+    int pointGoal = .9999 * currPoints;
     double step = 1;
     
     while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
@@ -653,8 +656,8 @@ int main(int argc, char **argv){
                 cut = cut/area;               
                 */
                 double oldMin = minArea;
-                //minArea *= sqrt(area);
-                maxArea =  2*minArea;
+                minArea *= area/10000;
+                maxArea =  10*minArea;
                 cut = 3*goodParticles/area;
                 densityCut = 0;//cut/20.0;
                if (cut < 5) 
@@ -663,7 +666,7 @@ int main(int argc, char **argv){
                     std::cerr << "Too low statistics at this Z and area" << std::endl;
                }
                 std::cout << "Area: " << area << std::endl;
-                int pointLimit = 1000;
+                int pointLimit = 10000;
                 do {
                     delete g2;
                     g2 = new TGraph();
@@ -689,7 +692,10 @@ int main(int argc, char **argv){
                     }
                     std::cout << "Considered points: " << g2->GetN() << std::endl;
                     if (g2->GetN() >= pointLimit)
+                    {
                         break;
+                        hull = new TGraph();
+                    }
                     hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
                     std::cout << "Resultant points: " << hull->GetN() << std::endl;
                     
