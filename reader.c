@@ -17,13 +17,17 @@ int z_pos = 0; //default starting position is z=0
 TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
-const int maxv = 100;
-double minArea = 30.0; //minimum area unit considered. smaller = less sensitive
-double criticalPoints = 2; //hits treated as zero. smaller = more sensitive
-double maxArea = 10 * minArea; //max area to prevent too large of a cut
+const int maxv = 100; //maximum number of points on the hull
+double minArea = .5; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
+//TODO edit to make relative
+double criticalPoints = 0.00000000; //difference in density to register a point. smaller = more points (but noisier)
+double maxAreaFactor = 10;
+double maxArea = maxAreaFactor * minArea; //do not ignore any area larger than this, regardless of density
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
-double cut = 15; //high density cut
-double densityCut = 0; //low density cut
+//make these density units relative
+double cut = 0.0; //1.0; //if both squares have a density higher than this, ignore both
+double densityCut = 0.1; //if the square has a density lower than this, ignore it as noise
+int stepK = 10;
 
 std::vector<double> particlesX;
 std::vector<double> particlesY;
@@ -115,16 +119,16 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
     //std::cout << "lower:" << lowerBound << std::endl;
     int nPoints = countPointsInBounds(rightBound, leftBound, upperBound, lowerBound);
     double density = nPoints/area;
-    if (g2->GetN() >= pointLimit || (nPoints == 0 || (area <= maxArea && density < densityCut)))
+    if (g2->GetN() >= pointLimit || (nPoints == 0 || (4*area <= maxArea && density <= densityCut)))
     {
         TGraph *g3 = new TGraph();
         g3->SetPoint(0, rightBound, upperBound);
         g3->SetPoint(1, rightBound, lowerBound);
         g3->SetPoint(2, leftBound, lowerBound);
         g3->SetPoint(3, leftBound, upperBound);
-        int densityColor = (int)(density  * 100);
-        if (densityColor <= 1) densityColor =2;
-        if (densityColor >= 100) densityColor =99;
+        int densityColor = (int)(density);
+        if (densityColor <= .1) densityColor =2;
+        if (densityColor >= 1) densityColor =99;
         g3->SetFillColor(densityColor);
         mg->Add(g3);
         return density;
@@ -144,29 +148,30 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
             for (int i = 0; i <4 ; i ++)
                 std::cout << i << ": " << d[i] << std::endl;
             */
+            //TODO edit to make relative instead of absolute
             // across bot
-            if ((d[0] < cut || d[1] < cut) && abs(d[0] - d[1]) >= criticalPoints)
+            if ((d[0] <= cut || d[1] <= cut) && abs(d[0] - d[1]) >= criticalPoints)
             {
                 g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), lowerBound + (yDelta/4));
             }
             // across left
-            if ((d[0] < cut || d[2] < cut) && abs(d[0] - d[2]) >= criticalPoints)
+            if ((d[0] <= cut || d[2] <= cut) && abs(d[0] - d[2]) >= criticalPoints)
             {
                 g2->SetPoint(g2->GetN(), leftBound + (xDelta/4), lowerBound + (yDelta/2));
             }
             // across diags
-            if ( ( (d[0] < cut || d[3] < cut) && abs(d[0] - d[3]) >= criticalPoints) 
-                    || ((d[1] < cut || d[2] < cut) && abs(d[1] - d[2]) > criticalPoints))
+            if ( ( (d[0] <= cut || d[3] <= cut) && abs(d[0] - d[3]) >= criticalPoints) 
+                    || ((d[1] <= cut || d[2] <= cut) && abs(d[1] - d[2]) >= criticalPoints))
             {
                 g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), lowerBound + (yDelta/2));
             }
             // across right
-            if ((d[1] < cut || d[3] < cut) && abs(d[1] - d[3]) >= criticalPoints)
+            if ((d[1] <= cut || d[3] <= cut) && abs(d[1] - d[3]) >= criticalPoints)
             {
                 g2->SetPoint(g2->GetN(), rightBound - (xDelta/4), lowerBound + (yDelta/2));
             }
             // across top
-            if ((d[2] < cut || d[3] < cut) && abs(d[2] - d[3]) >= criticalPoints)
+            if ((d[2] <= cut || d[3] <= cut) && abs(d[2] - d[3]) >= criticalPoints)
             {
                 g2->SetPoint(g2->GetN(), rightBound - (xDelta/2), upperBound - (yDelta/4));
             }
@@ -395,7 +400,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (hull->GetN() > maxv)
         {
             std::cout << "Too many vertices. Generating smoother hull..." << std::endl;
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
 
         //std::cout << "check 1" << std::endl;
@@ -464,7 +469,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
         if (intersects){ //all intersections. Must increase k
             std::cout << "Too many intersections." << std::endl;   
             //return hull ; //FIXME
-            return orderPoints(pointList, k+1);
+            return orderPoints(pointList, k+stepK);
         }
         kNearestPoints->GetPoint(i, cX, cY);
         //std::cout << "check" << cX << " " << cY << " " << tX << " " << tY << std::endl;
@@ -482,7 +487,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
     std::cout << getPointsEnclosed(hull) << "/" << goodParticles << std::endl;
     if (!allInside){
         std::cout << "Enclose more points" << std::endl;
-        return orderPoints(pointList, k+1);
+        return orderPoints(pointList, k+stepK);
     }
     return hull;
 }
@@ -490,7 +495,7 @@ TGraph* orderPoints(TGraph* pointList, int k)
 double* get99Area(double xMax, double xMin, double yMax, double yMin)
 {
     int currPoints = countPointsInBounds(xMax, xMin, yMax, yMin);
-    int pointGoal = .998 * currPoints;
+    int pointGoal = currPoints;
     double step = 1;
     
     while(pointGoal < countPointsInBounds(xMax, xMin, yMax, yMin))
@@ -653,17 +658,16 @@ int main(int argc, char **argv){
                 cut = cut/area;               
                 */
                 double oldMin = minArea;
-                //minArea *= sqrt(area);
-                maxArea =  2*minArea;
+                minArea *= z_pos*z_pos/2000000.0;
+                maxArea =  maxAreaFactor *minArea;
                 cut = 3*goodParticles/area;
-                densityCut = 0;//cut/20.0;
                if (cut < 5) 
                {
                     cut = 5;
                     std::cerr << "Too low statistics at this Z and area" << std::endl;
                }
                 std::cout << "Area: " << area << std::endl;
-                int pointLimit = 1000;
+                int pointLimit = 10000;
                 do {
                     delete g2;
                     g2 = new TGraph();
@@ -689,7 +693,10 @@ int main(int argc, char **argv){
                     }
                     std::cout << "Considered points: " << g2->GetN() << std::endl;
                     if (g2->GetN() >= pointLimit)
+                    {
                         break;
+                        hull = new TGraph();
+                    }
                     hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
                     std::cout << "Resultant points: " << hull->GetN() << std::endl;
                     
@@ -716,7 +723,7 @@ int main(int argc, char **argv){
                             leftX = x;
                             rightX = x;
                             leftIndex = j;
-                            std::cout << "l, r: " << leftIndex << ", " << rightIndex << std::endl;
+                            //std::cout << "l, r: " << leftIndex << ", " << rightIndex << std::endl;
                         }
                         else
                         {
@@ -739,7 +746,7 @@ int main(int argc, char **argv){
                     {
                         double x, y;
                         hull->GetPoint(j, x, y);
-                        std::cout << "Saving " << j << ": " << x << ", " << y << std::endl;
+                        //std::cout << "Saving " << j << ": " << x << ", " << y << std::endl;
                         continue;
                     }
                     double x, y;
@@ -747,7 +754,7 @@ int main(int argc, char **argv){
                     
                     if (y < 5)
                     {
-                        std::cout << "Removing " << j << ": " << x << ", " << y << std::endl;
+                        //std::cout << "Removing " << j << ": " << x << ", " << y << std::endl;
                         hull->RemovePoint(j--);
                         leftIndex--;
                         rightIndex--;
@@ -759,7 +766,7 @@ int main(int argc, char **argv){
                 //cut = oldMaxDensity;
                 //densityCut = oldMinDensity;
                 minArea = oldMin;
-                maxArea = 10* minArea;
+                maxArea = maxAreaFactor * minArea;
                 std::cout << "Hull points: " << hull->GetN() << std::endl;
                 particleGraph->SetMarkerStyle(6);
                 particleGraph->SetMarkerColor(4);
