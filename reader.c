@@ -22,11 +22,11 @@ const double smoothFactor = 0; //deviation from cos^2 (theta) = -1 that is still
 double minArea = 0; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
 //TODO edit to make relative
 double criticalPoints = 0.00000000; //difference in density to register a point. smaller = more points (but noisier)
-double maxAreaFactor = 10;
+double maxAreaFactor = 16;
 double maxArea = maxAreaFactor * minArea; //do not ignore any area larger than this, regardless of density
 int startK = 30; //starting number of points to look at. Higher is a smoother hull
 //make these density units relative
-double cut = 0.01; //1.0; //if both squares have a density higher than this, ignore both
+double cut = 0.1; //1.0; //if both squares have a density higher than this, ignore both
 double densityCut = 5; //if the square has a density lower than this, ignore it as noise
 int stepK = 10;
 int pointLimit = 10000; //max number of points to consider for the hull
@@ -646,10 +646,16 @@ int main(int argc, char **argv){
                 //g2->SetPoint(g2->GetN(), -9999, 0);
                 double xMax, xMin, yMax, yMin;
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
-                xMax += 10;
-                xMin -= 10;
-                yMax += 10;
-                yMin -= 10;
+                xMax += 100;
+                xMin -= 100;
+                yMax += 100;
+                yMin -= 100;
+                std::cout << "xMax: " << xMax << std::endl;
+                std::cout << "xMin: " << xMin << std::endl;
+                std::cout << "yMax: " << yMax << std::endl;
+                std::cout << "yMin: " << yMin << std::endl;
+                
+                
                 double area = (xMax - xMin) * (yMax - yMin);
                 std::cout << "Generating..." << std::endl;
 
@@ -659,7 +665,7 @@ int main(int argc, char **argv){
                 //xMin = res[2];
                 //yMax = res[3];
                 //yMin = res[4];
-                yMin = (yMin > -6)? -6 : yMin;
+                yMin = (yMin > -10)? -10 : yMin;
 
                 double heightRatio = (yMax-yMin) / (xMax-xMin);;
                 std::cout << "Height to Width: " << heightRatio << std::endl;
@@ -700,7 +706,7 @@ int main(int argc, char **argv){
                     double range = (yMax - yMin)/cutTimes;
                     for (int i = 0; i < cutTimes; i++)
                     {
-                        checkQuadrant(xMax, xMin, yMin+(range/heightRatio)*(i+1), yMin+(range/heightRatio)*(i), pointLimit);
+                        checkQuadrant(xMax, xMin, yMin+(range)*(i+1), yMin+(range)*(i), pointLimit);
                     }
                     std::cout << "Considered points: " << g2->GetN() << std::endl;
                     if (g2->GetN() >= pointLimit)
