@@ -17,7 +17,7 @@ int z_pos = 0; //default starting position is z=0
 TGraph* g2;
 TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
-const int maxv = 100; //maximum number of points on the hull
+const int maxv = 30; //maximum number of points on the hull
 const double smoothFactor = 0; //deviation from cos^2 (theta) = -1 that is still a straight line 
 double minArea = 0; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
 //TODO edit to make relative
@@ -646,10 +646,10 @@ int main(int argc, char **argv){
                 //g2->SetPoint(g2->GetN(), -9999, 0);
                 double xMax, xMin, yMax, yMin;
                 particleGraph->ComputeRange(xMin, yMin, xMax, yMax);
-                xMax += 100;
-                xMin -= 100;
-                yMax += 100;
-                yMin -= 100;
+                xMax += 5;
+                xMin -= 5;
+                yMax += 5;
+                yMin -= 5;
                 std::cout << "xMax: " << xMax << std::endl;
                 std::cout << "xMin: " << xMin << std::endl;
                 std::cout << "yMax: " << yMax << std::endl;
@@ -731,7 +731,7 @@ int main(int argc, char **argv){
                     double x, y;
                     hull->GetPoint(j, x, y);
                     
-                    if (y < 10)
+                    if (y <= 6)
                     {
                         hull->SetPoint(j, x, 0);
                         if (first)
@@ -771,7 +771,7 @@ int main(int argc, char **argv){
                     double x, y;
                     hull->GetPoint(j, x, y);
                     
-                    if (y < 5)
+                    if (y < 0)
                     {
                         //std::cout << "Removing " << j << ": " << x << ", " << y << std::endl;
                         hull->RemovePoint(j--);
