@@ -12,8 +12,6 @@
 #include <fstream>
 #include "remolltypes.hh"
 
-double* get99Area(double, double, double, double);
-
 //TODO better checking of the bottom
 double epsilon = 0.0001;
 
@@ -25,15 +23,15 @@ TMultiGraph *mg = new TMultiGraph();
 TGraph* hull;
 const int maxv = 100; //maximum number of points on the hull
 const double smoothFactor = 0; //deviation from cos^2 (theta) = -1 that is still a straight line 
-double minArea = 50; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
+double minArea = 600; //minimum area unit considered. smaller = more points, larger = more meaningful points (but less overall)
 //TODO edit to make relative
 double criticalPoints = 0.00000000; //difference in density to register a point. smaller = more points (but noisier)
 double maxAreaFactor = 16;
 double maxArea = maxAreaFactor * minArea; //do not ignore any area larger than this, regardless of density
-int startK = 10; //starting number of points to look at. Higher is a smoother hull
+int startK = 30; //starting number of points to look at. Higher is a smoother hull
 //make these density units relative
-double cut = 1; //1.0; //if both squares have a density higher than this, ignore both
-double densityCut = 7; //if the square has a density lower than this, ignore it as noise
+double cut = 0.1; //1.0; //if both squares have a density higher than this, ignore both
+double densityCut = 2; //if the square has a density lower than this, ignore it as noise
 int stepK = 10;
 int pointLimit = 10000; //max number of points to consider for the hull
 
@@ -50,10 +48,13 @@ int countTextFile(int thisZ, char* filename) {
     //tree->Print();
     //TODO reading data into envelopes downstream could be sped up
     //by storing the data by Z instead of by hit
+    std::cout << "start " << std::endl;
     tree->SetBranchAddress("part", &particle); 
     for (int i = 0; i < tree->GetEntries(); i++)
     {
+        std::cerr << "c1 " << std::endl;
         tree->GetEntry(i);
+        std::cerr << "c2 " << std::endl;
         for (size_t j = 0; j < particle->size(); j++)
         {
             std::vector < double > *z = &(particle->at(j).tjz);
@@ -67,6 +68,7 @@ int countTextFile(int thisZ, char* filename) {
             }
         }
     }
+    std::cerr << "stop " << std::endl;
     std::cout << "Good Particles: " << tempGoodParticles << std::endl;
     return tempGoodParticles;	
 }
@@ -98,6 +100,7 @@ void readTextFile(int thisZ, char* filename){
                     particlesY.push_back(y->at(k));
                     break;
                 }
+                std::cerr << "start3 " << std::endl;
             }
         }
     }
@@ -145,7 +148,7 @@ double checkQuadrant(double rightBound, double leftBound, double upperBound, dou
     else //enough points to not be noise
     { 	//but where are those points?
         //std::cout << "recur" << std::endl;
-        if (16*area <= minArea) return density;
+        if (4*4*area <= minArea) return density;
         double d[4];
         d[0] = checkQuadrant(rightBound - (xDelta/2), leftBound, upperBound - (yDelta/2), lowerBound, pointLimit); //bot  left	
         d[1] = checkQuadrant(rightBound, rightBound - (xDelta/2), upperBound - (yDelta/2), lowerBound, pointLimit); //bot right	
@@ -306,6 +309,7 @@ bool IntersectsQ(TGraph* g1, int pid1, TGraph* g2, int pid2, TGraph* g3, int pid
         */
     if (abs(den) <= epsilon)
     {
+        //return true;   
         if ( abs(dist(p1x, p1y, p3x, p3y) + dist(p3x, p3y, p2x, p2y) - dist(p1x, p1y, p2x, p2y)) <= epsilon)
             return true;
         if ( abs(dist(p1x, p1y, p4x, p4y) + dist(p4x, p4y, p2x, p2y) - dist(p1x, p1y, p2x, p2y)) <= epsilon)
@@ -381,15 +385,10 @@ TGraph* orderPoints(TGraph* pointList, int k)
     if (data->GetN() == 3) {hull = data; return hull;}
 
     if (k > data->GetN()) return hull;
+    //k = (k>data->GetN()-1)?data->GetN()-1 : k;
 
     //first point is the lowest
-    //data->Sort(TGraph::CompareY);
-    double xMin, yMin, xMax, yMax;
-    data->ComputeRange(xMin, yMin, xMax, yMax);
-    cX = (xMax+xMin)/2;
-    cY = (yMax+yMin)/2;
-    data->Sort(&AngleComparator, kFALSE); 
-    std::cout << "First Point: " << cX << ", " << cY << std::endl;
+    data->Sort(TGraph::CompareY);
     double tX, tY;
     data->GetPoint(0,  tX, tY);
     hull->SetPoint(0, tX, tY);
@@ -463,12 +462,13 @@ TGraph* orderPoints(TGraph* pointList, int k)
             intersects = false;
             while (!intersects && j <= hull->GetN() - lastPoint)
             {
-                  /*std::cout << "hull " << step-2 << std::endl;
+                std::cout << "info " << hull->GetN() << std::endl;
+                  std::cout << "hull " << step-2 << std::endl;
                   std::cout << "kNear " << i << std::endl;
                   std::cout << "hull " << step-1-j << std::endl;
                   std::cout << "hull " << step-j << std::endl;
-                  */intersects = IntersectsQ(hull, step-2, kNearestPoints, i, hull, step-1-j, hull, step-j);
-                //std::cout << "Intersects: " << intersects << std::endl;
+                  intersects = IntersectsQ(hull, step-2, kNearestPoints, i, hull, step-1-j, hull, step-j);
+                std::cout << "Intersects: " << intersects << std::endl;
                 j++;
             }
             if (!intersects)
@@ -555,7 +555,7 @@ int main(int argc, char **argv){
     //gROOT->SetBatch(kFALSE);
     if (argc != 2 && argc != 3 && argc != 5 && argc != 8)
     {
-        std::cerr << "Usage: ./reader file_name [startZ <stopZ step [startK minArea densityCut]>])" << std::endl;
+        std::cerr << "Usage: ./reader file_name [startZ <stopZ step [startK minArea criticalPoints]>])" << std::endl;
         exit(0);
     }
     double startZ;
@@ -582,7 +582,7 @@ int main(int argc, char **argv){
         {
             startK = atof(argv[5]);
             minArea = atof(argv[6]);
-            densityCut = atof(argv[7]);
+            criticalPoints = atof(argv[7]);
         }
     }
     
@@ -731,24 +731,18 @@ int main(int argc, char **argv){
                         double zX, zY;
                         g2->GetPoint(i, zX, zY);
                         if (zY < 5)
-                        {
                             zY = 0;
-                            g2->RemovePoint(i--);
-                        }
-                        //g2->SetPoint(i, zX, zY);
+                        g2->SetPoint(i, zX, zY);
                         if (zY == 0 && zX < minX)
                             minX = zX;
                         if (zY == 0 && zX > maxX)
                             maxX = zX;
 
                     }
-                    double del = sqrt(minArea);
-                    for (double i = minX; i < maxX; i+= del)
+                    for (double i = minX; i < maxX; i+= sqrt(minArea))
                         g2->SetPoint(g2->GetN(), i, 0);
-                    g2->SetPoint(g2->GetN(), maxX, 0);
 
                     hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
-                    //hull = orderPoints(g2, (g2->GetN() > startK)? startK : g2->GetN());
                     std::cout << "Resultant points: " << hull->GetN() << std::endl;
                      
                 }while (false && hull->GetN() <= 10);
