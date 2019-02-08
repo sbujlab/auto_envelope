@@ -583,22 +583,33 @@ int reader_manual(){
                 particleGraph->SetMarkerStyle(6);
                 particleGraph->SetMarkerColor(4);
 
-                particleGraph->Draw("AP");
-                gPad->Modified();
-                gPad->Update();
                 // do user interactions here:
                 if (!gPad) {
                     std::cout << "pad1 is null" << std::endl;
                     //break;
                 }
-                char command[50];
-                sprintf(command,"DynamicCoordinates()");
-                gPad->AddExec("ex1",command);
-                gPad->WaitPrimitive();
-                gPad->WaitPrimitive();
-                gPad->DeleteExec(command);
-                hull = g2;
-
+                char good = 'n';
+                while (good != 'y')
+                {
+                    particleGraph->Draw("AP");
+                    gPad->Modified();
+                    gPad->Update();
+                    while(g2->GetN() > 0)
+                        g2->RemovePoint(0);
+                    char command[50];
+                    sprintf(command,"DynamicCoordinates()");
+                    gPad->AddExec("ex1",command);
+                    gPad->WaitPrimitive();
+                    gPad->WaitPrimitive();
+                    gPad->DeleteExec("ex1");
+                    hull = g2;
+                    hull->Draw("AL");
+                    particleGraph->Draw("Psame");
+                    gPad->Modified();
+                    gPad->Update();
+                    std::cout << "Is this output good? y/n" << std::endl;
+                    std::cin >> good;
+                }
                 double first = true;
                 int rightIndex, leftIndex;
                 double leftX, rightX;
