@@ -533,7 +533,7 @@ void DynamicCoordinates() {
 
 int reader_manual(){
     //gROOT->SetBatch(kFALSE);
-    std::cerr << "Usage: root reader_manual.c < file_name" << std::endl;
+    std::cerr << "Usage: reroot reader_manual.c" << std::endl;
 
     char fileName[100];
     std::cout << "\nFilename: ";
